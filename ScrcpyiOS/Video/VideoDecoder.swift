@@ -63,9 +63,9 @@ final class VideoDecoder {
         status = annexB.withUnsafeBytes { raw in
             CMBlockBufferReplaceDataBytes(
                 with: raw.baseAddress!,
+                blockBuffer: bb,
                 offsetIntoDestination: 0,
-                dataLength: annexB.count,
-                destinationBlockBuffer: bb
+                dataLength: annexB.count
             )
         }
         guard status == kCMBlockBufferNoErr else { return }
@@ -89,11 +89,6 @@ final class VideoDecoder {
         )
         guard sstatus == noErr, let sbuf = sampleBuffer else { return }
 
-        // 低延迟：解码出即显示，不要缓冲
-        var dict: [String: Any] = [:]
-        dict[kCMSampleAttachmentKey_DisplayImmediately as String] = true
-        CMSampleBufferSetSampleAttachmentsArray(sbuf, value: [dict] as CFArray)
-
         var infoFlags: VTDecodeInfoFlags = []
         let err = VTDecompressionSessionDecodeFrame(
             session,
@@ -112,33 +107,29 @@ final class VideoDecoder {
 
     private func createFormatDescription(sps: Data, pps: Data) {
         var desc: CMVideoFormatDescription?
-        let spsPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: sps.count)
-        spsPtr.initialize(from: Array(sps), count: sps.count)
-        let ppsPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: pps.count)
-        ppsPtr.initialize(from: Array(pps), count: pps.count)
+        let spsBytes = [UInt8](sps)
+        let ppsBytes = [UInt8](pps)
+        let sizes = [spsBytes.count, ppsBytes.count]
 
-        let paramSets: [UnsafeMutablePointer<UInt8>?] = [spsPtr, ppsPtr]
-        let paramSizes: [Int] = [sps.count, pps.count]
-
-        // 注意：这里必须把指针数组转成 UnsafePointer，使用 withUnsafeBytes 风格较繁琐，
-        // 直接用临时变量绑定。
-        var status: OSStatus = 0
-        paramSets.withUnsafeBufferPointer { buf in
-            sps.withUnsafeBytes { _ in
-                pps.withUnsafeBytes { _ in
-                    status = CMVideoFormatDescriptionCreateFromH264ParameterSets(
+        // CMVideoFormatDescriptionCreateFromH264ParameterSets 要求
+        // UnsafePointer<UnsafePointer<UInt8>> 与 UnsafePointer<Int>
+        let status: OSStatus = spsBytes.withUnsafeBufferPointer { spsBuf in
+            ppsBytes.withUnsafeBufferPointer { ppsBuf in
+                let pointers: [UnsafePointer<UInt8>] = [
+                    spsBuf.baseAddress!, ppsBuf.baseAddress!
+                ]
+                return pointers.withUnsafeBufferPointer { ptrBuf in
+                    CMVideoFormatDescriptionCreateFromH264ParameterSets(
                         allocator: nil,
                         parameterSetCount: 2,
-                        parameterSetPointers: buf.baseAddress!,
-                        parameterSetSizes: paramSizes,
+                        parameterSetPointers: ptrBuf.baseAddress!,
+                        parameterSetSizes: sizes,
                         nalUnitHeaderLength: 4,
                         formatDescriptionOut: &desc
                     )
                 }
             }
         }
-        spsPtr.deallocate()
-        ppsPtr.deallocate()
 
         guard status == noErr, let d = desc else {
             print("[VideoDecoder] 创建格式描述失败: \(status)")

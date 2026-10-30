@@ -52,6 +52,18 @@ struct ADBMessage {
         self.data = data
     }
 
+    /// 反序列化时使用：直接按解析出的字段构造
+    init(command: UInt32, arg0: UInt32, arg1: UInt32,
+         dataLength: UInt32, dataCheck: UInt32, magic: UInt32, data: Data) {
+        self.command = command
+        self.arg0 = arg0
+        self.arg1 = arg1
+        self.dataLength = dataLength
+        self.dataCheck = dataCheck
+        self.magic = magic
+        self.data = data
+    }
+
     /// 序列化为网络字节
     func toData() -> Data {
         var out = Data(capacity: ADBMessage.headerSize + data.count)

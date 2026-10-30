@@ -96,6 +96,10 @@ final class ScreenRenderer: NSObject, MTKViewDelegate {
         lock.unlock()
     }
 
+    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
+        // 视图尺寸变化时无需处理，渲染按 drawable 自适应
+    }
+
     func draw(in view: MTKView) {
         lock.lock()
         let buffer = latestBuffer
