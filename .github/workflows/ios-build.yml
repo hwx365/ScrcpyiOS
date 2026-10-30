@@ -1,0 +1,71 @@
+name: Build unsigned IPA
+
+# 用途：在没有 Mac 的情况下，借 GitHub 的 macOS 机器编译出「未签名 .ipa」。
+# 下载该 ipa 后，在 Windows 上用 Sideloadly + 你的 Apple ID 重签并安装到 iPhone。
+#
+# 产物位置：Actions -> 选一次运行 -> 页面底部 Artifacts -> ScrcpyiOS-unsigned-ipa
+#
+# 目录结构注意：ScrcpyiOS.xcodeproj 在仓库根，源码在 ScrcpyiOS/ 子目录。
+# 所以下面所有命令都从仓库根执行，不要给 Build 步骤设 working-directory。
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: xcodebuild + package ipa
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          echo "--- 仓库根目录 ---"
+          ls -la
+
+      - name: Build (no codesign)
+        run: |
+          echo "--- 确认工程文件位置 ---"
+          ls -d ScrcpyiOS.xcodeproj
+          xcodebuild \
+            -project ScrcpyiOS.xcodeproj \
+            -scheme ScrcpyiOS \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/dd" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package unsigned IPA
+        run: |
+          APP="$RUNNER_TEMP/dd/Build/Products/Release-iphoneos/ScrcpyiOS.app"
+          if [ ! -d "$APP" ]; then
+            echo "ERROR: 没找到构建产物 $APP"
+            ls -R "$RUNNER_TEMP/dd/Build/Products" || true
+            exit 1
+          fi
+          # .ipa 就是「Payload 目录 + zip」，目录名必须精确为 Payload
+          rm -rf Payload ScrcpyiOS-unsigned.ipa
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry ScrcpyiOS-unsigned.ipa Payload
+          echo "--- ipa 内容 ---"
+          unzip -l ScrcpyiOS-unsigned.ipa | head -30
+          ls -lh ScrcpyiOS-unsigned.ipa
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ScrcpyiOS-unsigned-ipa
+          path: ScrcpyiOS-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
