@@ -176,13 +176,25 @@ scrcpy 的“服务端/客户端”二进制协议属于**内部协议，随版�
 
 ## 九、免 Mac：用 GitHub Actions 自动编译 IPA（可选）
 
-本工程已内置 `.github/workflows/build-ipa.yml` 与共享 Scheme，push 到 GitHub 后会自动**编译出未签名 IPA** 产物。
+本工程已内置 `.github/workflows/ios-build.yml` 与共享 Scheme `ScrcpyiOS.xcscheme`，
+push 后 GitHub 的 macOS 机器会自动**编译出未签名 IPA**。
 
-### 步骤
-1. 在 GitHub 新建仓库，把 **`ScrcpyiOS/` 目录里的内容**（含 `ScrcpyiOS.xcodeproj`、`ScrcpyiOS/`、`.github/`）作为仓库根提交并 push。
-   - 注意：仓库根必须就是工程根，`ScrcpyiOS.xcodeproj` 要在根目录（`.github` 同级）。
-2. 打开仓库 **Actions** 页 → 选 `Build Unsigned IPA` → Run workflow（或直接 push 触发）。
-3. 跑完后在该次运行页面底部 **Artifacts** 下载 `ScrcpyiOS-unsigned-ipa`，解压得 `ScrcpyiOS-unsigned.ipa`。
+当前仓库：<https://github.com/hwx365/ScrcpyiOS>（public）。
+
+### 一条命令出包（推荐）
+工程自带 `tools/rebuild.py`，在本机终端执行：
+
+```powershell
+cd c:\Users\wxw\Desktop\wxw-kf\ScrcpyiOS
+python tools\rebuild.py -m "这次改了什么"
+```
+
+它会自动完成：提交 → 走 REST API 推送（`tools/gh_api_push.py`，绕开国内 git push）→
+按远端 commit 精确匹配并等待 Actions 编译 → 下载 `ScrcpyiOS-unsigned.ipa` 到 `..\ipa\` → 校验 Info.plist。
+
+### 手工等价步骤
+1. 仓库根必须就是工程根（`ScrcpyiOS.xcodeproj` 与 `.github/` 同级）。
+2. 浏览器打开仓库 **Actions** → 等绿勾 → 页面底部 **Artifacts** → 下载 `ScrcpyiOS-unsigned-ipa`。
 
 ### ⚠️ 未签名 IPA 不能直接装，需要你自己重签
 - 用 **Sideloadly**（Windows/Mac）或 **AltStore**，登录**你自己的 Apple ID**，把上面的 unsigned IPA 拖进去，
