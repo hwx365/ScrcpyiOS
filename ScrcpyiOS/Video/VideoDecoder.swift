@@ -151,8 +151,7 @@ final class VideoDecoder {
     private func createSession() {
         guard let desc = formatDesc else { return }
         var session: VTDecompressionSession?
-        let callback: VTDecompressionOutputCallback = { (
-            decompressionOutputRefCon, _, status, _, imageBuffer, _, _ in
+        let callback: VTDecompressionOutputCallback = { decompressionOutputRefCon, _, status, _, imageBuffer, _, _ in
             guard status == noErr, let pixelBuffer = imageBuffer else { return }
             let decoder = Unmanaged<VideoDecoder>.fromOpaque(decompressionOutputRefCon!).takeUnretainedValue()
             decoder.onFrame?(pixelBuffer)
